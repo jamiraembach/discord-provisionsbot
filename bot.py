@@ -1,4 +1,5 @@
 import os
+import psycopg2
 import discord
 from discord import app_commands
 from discord.ext import tasks
@@ -31,7 +32,7 @@ intents = discord.Intents.default()
 bot = discord.Client(intents=intents)
 tree = app_commands.CommandTree(bot)
 
-db = sqlite3.connect("verkauf.db")
+db = psycopg2.connect(os.getenv("DATABASE_URL"))
 cursor = db.cursor()
 
 
