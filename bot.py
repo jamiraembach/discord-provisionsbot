@@ -98,10 +98,10 @@ def setup_database():
     db.commit()
 
     for name, price, category in STANDARD_PRODUKTE:
-        cursor.execute("""
-            INSERT OR IGNORE INTO products (name, price, category)
-            VALUES (?, ?, ?)
-        """, (name, price, category))
+       cursor.execute("""
+    INSERT INTO products (name, price, category)
+    VALUES (%s, %s, %s)
+""", (name, price, category))
 
     db.commit()
 
@@ -121,7 +121,7 @@ def create_report_embed(user_id: str, username: str):
             COALESCE(SUM(final_price), 0),
             COALESCE(SUM(commission), 0)
         FROM sales
-        WHERE user_id = ? AND DATE(created_at) = ?
+        WHERE user_id = %s AND DATE(created_at) = %s
     """, (user_id, today))
 
     menge, umsatz_vor_rabatt, rabatt, endsumme, provision = cursor.fetchone()
@@ -129,7 +129,7 @@ def create_report_embed(user_id: str, username: str):
     cursor.execute("""
         SELECT category, COALESCE(SUM(quantity), 0), COALESCE(SUM(final_price), 0)
         FROM sales
-        WHERE user_id = ? AND DATE(created_at) = ?
+        WHERE user_id = %s AND DATE(created_at) = %s
         GROUP BY category
     """, (user_id, today))
 
@@ -181,7 +181,7 @@ async def do_verkauf(interaction, produkt: str, menge: int, rabatt_prozent: floa
         await interaction.response.send_message("Rabatt muss zwischen 0 und 100 Prozent liegen.", ephemeral=True)
         return
 
-    cursor.execute("SELECT name, price, category FROM products WHERE name = ?", (produkt,))
+    cursor.execute("SELECT name, price, category FROM products WHERE name = %s", (produkt,))
     product = cursor.fetchone()
 
     if not product:
@@ -201,7 +201,7 @@ async def do_verkauf(interaction, produkt: str, menge: int, rabatt_prozent: floa
             price_before_discount, discount_percent, discount_amount,
             final_price, commission, created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         str(interaction.user.id),
         interaction.user.name,
@@ -243,7 +243,7 @@ async def do_verkauf(interaction, produkt: str, menge: int, rabatt_prozent: floa
 async def do_einstempeln(interaction):
     cursor.execute("""
         SELECT id FROM time_clock
-        WHERE user_id = ? AND active = 1
+        WHERE user_id = %s AND active = 1
     """, (str(interaction.user.id),))
 
     if cursor.fetchone():
@@ -254,7 +254,7 @@ async def do_einstempeln(interaction):
 
     cursor.execute("""
         INSERT INTO time_clock (user_id, username, clock_in, active)
-        VALUES (?, ?, ?, 1)
+        VALUES (%s, %s, %s, 1)
     """, (
         str(interaction.user.id),
         interaction.user.name,
@@ -278,7 +278,7 @@ async def do_einstempeln(interaction):
 async def do_ausstempeln(interaction):
     cursor.execute("""
         SELECT id, clock_in FROM time_clock
-        WHERE user_id = ? AND active = 1
+        WHERE user_id = %s AND active = 1
     """, (str(interaction.user.id),))
 
     row = cursor.fetchone()
@@ -294,8 +294,8 @@ async def do_ausstempeln(interaction):
 
     cursor.execute("""
         UPDATE time_clock
-        SET clock_out = ?, active = 0
-        WHERE id = ?
+        SET clock_out = %s, active = 0
+        WHERE id = %s
     """, (end.isoformat(), entry_id))
 
     db.commit()
@@ -320,7 +320,7 @@ async def do_arbeitszeit(interaction):
     cursor.execute("""
         SELECT clock_in, clock_out
         FROM time_clock
-        WHERE user_id = ? AND DATE(clock_in) = ?
+        WHERE user_id = %s AND DATE(clock_in) = %s
     """, (str(interaction.user.id), heute))
 
     total_seconds = 0
@@ -367,7 +367,7 @@ class ReportButtons(discord.ui.View):
         cursor.execute("""
             SELECT COALESCE(SUM(commission), 0)
             FROM sales
-            WHERE user_id = ? AND paid = 0
+            WHERE user_id = %s AND paid = 0
         """, (str(interaction.user.id),))
 
         total = cursor.fetchone()[0]
@@ -419,7 +419,7 @@ class AbmeldungModal(discord.ui.Modal, title="Abmeldung eintragen"):
         cursor.execute("""
             INSERT INTO abmeldungen
             (user_id, username, datum_von, datum_bis, grund, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """, (
             str(interaction.user.id),
             interaction.user.name,
@@ -535,7 +535,7 @@ async def abmelden(interaction: discord.Interaction, datum_von: str, datum_bis: 
     cursor.execute("""
         INSERT INTO abmeldungen
         (user_id, username, datum_von, datum_bis, grund, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s)
     """, (
         str(interaction.user.id),
         interaction.user.name,
