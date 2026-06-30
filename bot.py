@@ -469,6 +469,104 @@ class AbmeldeButtons(discord.ui.View):
         button: discord.ui.Button
     ):
         await interaction.response.send_modal(AbmeldungModal())
+class AdminPanelButtons(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Offene Provisionen", emoji="📊", style=discord.ButtonStyle.blurple)
+    async def offene_provisionen(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Keine Berechtigung.", ephemeral=True)
+            return
+
+        cursor.execute("""
+            SELECT username, COALESCE(SUM(commission), 0)
+            FROM sales
+            WHERE paid = 0
+            GROUP BY user_id, username
+            ORDER BY SUM(commission) DESC
+        """)
+
+        rows = cursor.fetchall()
+
+        if not rows:
+            await interaction.response.send_message("Keine offenen Provisionen.", ephemeral=True)
+            return
+
+        text = ""
+        for username, total in rows:
+            text += f"**{username}**: {total:.2f}$\n"
+
+        embed = discord.Embed(
+            title="📊 Offene Provisionen",
+            description=text,
+            color=discord.Color.blurple()
+        )
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="Aktive Stempeluhr", emoji="🕒", style=discord.ButtonStyle.gray)
+    async def aktive_stempeluhr(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Keine Berechtigung.", ephemeral=True)
+            return
+
+        cursor.execute("""
+            SELECT username, clock_in
+            FROM time_clock
+            WHERE active = 1
+            ORDER BY clock_in ASC
+        """)
+
+        rows = cursor.fetchall()
+
+        if not rows:
+            await interaction.response.send_message("Niemand ist aktuell eingestempelt.", ephemeral=True)
+            return
+
+        text = ""
+        for username, clock_in in rows:
+            start = datetime.fromisoformat(clock_in)
+            text += f"**{username}** seit {start.strftime('%d.%m.%Y %H:%M')}\n"
+
+        embed = discord.Embed(
+            title="🕒 Aktive Stempeluhr",
+            description=text,
+            color=discord.Color.blue()
+        )
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="Abmeldungen", emoji="📋", style=discord.ButtonStyle.gray)
+    async def abmeldungen(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Keine Berechtigung.", ephemeral=True)
+            return
+
+        cursor.execute("""
+            SELECT username, datum_von, datum_bis, grund
+            FROM abmeldungen
+            ORDER BY created_at DESC
+            LIMIT 10
+        """)
+
+        rows = cursor.fetchall()
+
+        if not rows:
+            await interaction.response.send_message("Keine Abmeldungen vorhanden.", ephemeral=True)
+            return
+
+        text = ""
+        for username, von, bis, grund in rows:
+            text += f"**{username}**: {von} bis {bis}\nGrund: {grund}\n\n"
+
+        embed = discord.Embed(
+            title="📋 Letzte Abmeldungen",
+            description=text,
+            color=discord.Color.orange()
+        )
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 @bot.event
 async def on_ready():
@@ -609,5 +707,25 @@ async def abmeldecenter(interaction: discord.Interaction):
     await interaction.response.send_message(
         embed=embed,
         view=AbmeldeButtons()
+    )
+@tree.command(name="adminpanel", description="Öffnet das Admin Panel")
+@app_commands.checks.has_permissions(administrator=True)
+async def adminpanel(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="🛠️ Admin Panel",
+        description="Wähle eine Admin-Aktion über die Buttons.",
+        color=discord.Color.dark_gray()
+    )
+
+    embed.add_field(
+        name="Funktionen",
+        value="📊 Offene Provisionen\n🕒 Aktive Stempeluhr\n📋 Abmeldungen",
+        inline=False
+    )
+
+    await interaction.response.send_message(
+        embed=embed,
+        view=AdminPanelButtons(),
+        ephemeral=True
     )
 bot.run(TOKEN)
