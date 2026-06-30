@@ -469,6 +469,55 @@ class AbmeldeButtons(discord.ui.View):
         button: discord.ui.Button
     ):
         await interaction.response.send_modal(AbmeldungModal())
+
+class AuszahlungModal(discord.ui.Modal, title="Provision auszahlen"):
+    mitarbeiter_id = discord.ui.TextInput(
+        label="Discord User ID des Mitarbeiters",
+        placeholder="z.B. 123456789012345678",
+        required=True
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Keine Berechtigung.", ephemeral=True)
+            return
+
+        user_id = str(self.mitarbeiter_id.value).strip()
+
+        cursor.execute("""
+            SELECT COALESCE(SUM(commission), 0)
+            FROM sales
+            WHERE user_id = %s AND paid = 0
+        """, (user_id,))
+
+        total = cursor.fetchone()[0]
+
+        if total == 0:
+            await interaction.response.send_message(
+                "Dieser Mitarbeiter hat keine offene Provision.",
+                ephemeral=True
+            )
+            return
+
+        cursor.execute("""
+            UPDATE sales
+            SET paid = 1
+            WHERE user_id = %s AND paid = 0
+        """, (user_id,))
+
+        db.commit()
+
+        embed = discord.Embed(
+            title="✅ Provision ausgezahlt",
+            color=discord.Color.green()
+        )
+
+        embed.add_field(name="Mitarbeiter-ID", value=user_id, inline=False)
+        embed.add_field(name="Ausgezahlter Betrag", value=f"{total:.2f}$", inline=False)
+        embed.timestamp = datetime.now()
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
 class AdminPanelButtons(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -504,6 +553,14 @@ class AdminPanelButtons(discord.ui.View):
         )
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="Provision auszahlen", emoji="✅", style=discord.ButtonStyle.green)
+    async def provision_auszahlen(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Keine Berechtigung.", ephemeral=True)
+            return
+
+        await interaction.response.send_modal(AuszahlungModal())
 
     @discord.ui.button(label="Aktive Stempeluhr", emoji="🕒", style=discord.ButtonStyle.gray)
     async def aktive_stempeluhr(self, interaction: discord.Interaction, button: discord.ui.Button):
