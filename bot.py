@@ -39,7 +39,7 @@ cursor = db.cursor()
 def setup_database():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS products (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         name TEXT UNIQUE NOT NULL,
         price REAL NOT NULL,
         category TEXT DEFAULT 'Sonstiges'
@@ -48,7 +48,7 @@ def setup_database():
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS sales (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         user_id TEXT NOT NULL,
         username TEXT NOT NULL,
         product_name TEXT NOT NULL,
@@ -68,13 +68,13 @@ def setup_database():
     CREATE TABLE IF NOT EXISTS employee_channels (
         user_id TEXT PRIMARY KEY,
         username TEXT NOT NULL,
-        channel_id INTEGER NOT NULL
+        channel_id BIGINT NOT NULL
     )
     """)
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS abmeldungen (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         user_id TEXT NOT NULL,
         username TEXT NOT NULL,
         datum_von TEXT NOT NULL,
@@ -86,7 +86,7 @@ def setup_database():
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS time_clock (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         user_id TEXT NOT NULL,
         username TEXT NOT NULL,
         clock_in TEXT NOT NULL,
@@ -98,13 +98,13 @@ def setup_database():
     db.commit()
 
     for name, price, category in STANDARD_PRODUKTE:
-       cursor.execute("""
-    INSERT INTO products (name, price, category)
-    VALUES (%s, %s, %s)
-""", (name, price, category))
+        cursor.execute("""
+            INSERT INTO products (name, price, category)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (name) DO NOTHING
+        """, (name, price, category))
 
     db.commit()
-
 
 def today_string():
     return date.today().isoformat()
